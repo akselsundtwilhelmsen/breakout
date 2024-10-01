@@ -100,6 +100,7 @@ asm("DrawBlock: \n\t"
     "    BX LR");
 
 // TODO: Impelement the DrawBar function in assembly. You need to accept the parameter as outlined in the c declaration above (unsigned int y)
+// assumes R0 = y-coord
 asm("DrawBar: \n\t"
     "BX LR");
 

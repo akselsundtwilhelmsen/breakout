@@ -1,5 +1,5 @@
 .section .data
-	video_base: .word 0xC8000000  // Base address of the video memory
+	VGAaddress: .word 0xC8000000
 
 .section .text
 
