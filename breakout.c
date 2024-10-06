@@ -1,4 +1,5 @@
 unsigned long long __attribute__((used)) VGAaddress = 0xc8000000; // Memory storing pixels
+unsigned long long __attribute__((used)) UARTaddress = 0xFF201000; // Memory storing pixels
 unsigned int __attribute__((used)) red = 0x0000F0F0;
 unsigned int __attribute__((used)) green = 0x00000F0F;
 unsigned int __attribute__((used)) blue = 0x000000FF;
@@ -57,57 +58,83 @@ void WriteUart(char c);
  */
 
 asm("ClearScreen: \n\t"
-    "    PUSH {LR} \n\t"
-    "    PUSH {R4, R5} \n\t"
-	"	 LDR R0, =VGAaddress \n\t"
-	"	 LDR R1, [R0] \n\t"
-	"	 MOV R2, #0x00000000 \n\t"
-	"	 MOV R3, #307200 \n\t" // height * width
-	"ClearLoop: \n\t"
-	"	 STR R2, [R1], #4 \n\t"
-	"	 SUBS R3, R3, #1 \n\t"
-	"	 BNE ClearLoop \n\t"
-    "    POP {R4,R5} \n\t"
-    "    POP {LR} \n\t"
-    "    BX LR");
+	"push {r0, r1, r2, r3, r4, r5, r6, lr} \n\t"
+	"mov r0, #0 \n\t"
+	"mov r1, #0 \n\t"
+	"mov r2, #0x07E0 \n\t" // height * width
+	"mov r3, #320 \n\t"
+	"mov r4, #240 \n\t"
+	"bl DrawBlock \n\t"
+	"pop {r0, r1, r2, r3, r4, r5, r6, lr} \n\t"
+	"bx lr \n\t");
+
 
 // assumes R0 = x-coord, R1 = y-coord, R2 = colorvalue
 asm("SetPixel: \n\t"
-    "LDR R3, =VGAaddress \n\t"
-    "LDR R3, [R3] \n\t"
-    "LSL R1, R1, #10 \n\t"
-    "LSL R0, R0, #1 \n\t" // compensate for 2 byte color value
-    "ADD R1, R0 \n\t"
-    "STRH R2, [R3,R1] \n\t"
-    "BX LR");
+	"push {r0, r1, r2, r3, lr} \n\t"
+	"//mov r0, #20 // (input) \n\t"
+	"//mov r1, #30 // (input) \n\t"
+	"//mov r2, #0xFFFFFFFF // (input) \n\t"
+	"ldr r3, =VGAaddress \n\t"
+	"ldr r3, [r3] \n\t"
+	"lsl r1, r1, #10 \n\t"
+	"lsl r0, r0, #1 \n\t"
+	"add r1, r0 \n\t"
+	"strh r2, [r3, r1] \n\t"
+	"pop {r0, r1, r2, r3, lr} \n\t"
+	"bx lr \n\t");
+
 
 // TODO: Implement the DrawBlock function in assembly. You need to accept 5 parameters, as outlined in the c declaration above (unsigned int x, unsigned int y, unsigned int width, unsigned int height, unsigned int color)
 // assume R0 = x-coord, R1 = y-coord, R2 = colorvalue, R3 = width, R4 = height
 asm("DrawBlock: \n\t"
-	"	 add r5, r0, r3 \n\t"// final x
-	"    add r6, r1, r4 \n\t" // final y
+	"	push {r0, r1, r2, r3, r4, r5, r6, lr} \n\t"
+	"	//mov r0, #100 // x (input) \n\t"
+	"	//mov r1, #40 // y (input) \n\t"
+	"	//mov r2, #0xFFFFFFFF // color (input) \n\t"
+	"	//mov r3, #120 // width (input) \n\t"
+	"	//mov r4, #140 // height (input) \n\t"
+	"	add r5, r0, r3 // final x \n\t"
+	"	add r6, r1, r4 // final y \n\t"
 	"DrawLoop: \n\t"
-	"    push {r0, r1, r2, r3} \n\t"
-	"    bl SetPixel \n\t"
-	"    pop {r0, r1, r2, r3} \n\t"
-	"    add r0, r0, #1 \n\t"
-	"    cmp r0, r5 \n\t"
-	"    bne DrawLoop \n\t" // loop if x value is final
-	"    subs r0, r0, r3 \n\t"// reset x
-	"    add r1, r1, #1 \n\t"
-	"    cmp r1, r6 \n\t"
-	"    bne DrawLoop \n\t"// don't loop if y value is final
-    "    BX LR");
+	"	bl SetPixel \n\t"
+	"	add r0, r0, #1 \n\t"
+	"	cmp r0, r5 \n\t"
+	"	bne DrawLoop // don't loop if x value is final \n\t"
+	"	subs r0, r0, r3 // reset x \n\t"
+	"	add r1, r1, #1 \n\t"
+	"	cmp r1, r6 \n\t"
+	"	bne DrawLoop // don't loop if y value is final \n\t"
+	"	pop {r0, r1, r2, r3, r4, r5, r6, lr} \n\t"
+	"	bx lr \n\t");
+
 
 // TODO: Impelement the DrawBar function in assembly. You need to accept the parameter as outlined in the c declaration above (unsigned int y)
 // assumes R0 = y-coord
 asm("DrawBar: \n\t"
-    "BX LR");
+	"	push {r0, r1, r2, r3, r4, lr} \n\t"
+	"	mov r1, r0 // y is first input \n\t"
+	"	mov r0, #0 \n\t"
+	"	//mov r1, #120 // (input) \n\t"
+	"	mov r2, #0xFFFFFFFF \n\t"
+	"	mov r3, #7 \n\t"
+	"	mov r4, #45 \n\t"
+	"	bl DrawBlock \n\t"
+	"	pop {r0, r1, r2, r3, r4, lr} \n\t"
+	"	bx lr \n\t");
 
-asm("ReadUart:\n\t"
-    "LDR R1, =0xFF201000 \n\t"
-    "LDR R0, [R1]\n\t"
-    "BX LR");
+asm("ReadUart: \n\t"
+	"	push {r0, r1, lr} \n\t"
+	"	ldr r1, =UARTaddress \n\t"
+	"	ldr r0, [r1] \n\t"
+	"	pop {r0, r1, lr} \n\t"
+	"	bx lr \n\t");
+
+asm("WriteUart: \n\t"
+	"	push {lr} \n\t"
+	"	pop {lr} \n\t"
+	"	bx lr \n\t");
+
 
 // TODO: Add the WriteUart assembly procedure here that respects the WriteUart C declaration on line 46
 
