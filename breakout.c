@@ -58,56 +58,48 @@ void WriteUart(char c);
  */
 
 asm("ClearScreen: \n\t"
-	"push {r0, r1, r2, r3, r4, r5, r6, lr} \n\t"
-	"mov r0, #0 \n\t"
-	"mov r1, #0 \n\t"
-	"mov r2, #0x07E0 \n\t" // height * width
-	"mov r3, #320 \n\t"
-	"mov r4, #240 \n\t"
-	"bl DrawBlock \n\t"
-	"pop {r0, r1, r2, r3, r4, r5, r6, lr} \n\t"
-	"bx lr \n\t");
-
+	"	mov r0, #0 \n\t"
+	"	mov r1, #0 \n\t"
+	"	mov r2, #320 \n\t"
+	"	mov r3, #240 \n\t"
+	"	mov r4, #0x07e0 \n\t"
+	"	push {r0, r1, r2, r3, r4, r5, r6, r7, lr} \n\t"
+	"	push {r4, lr} \n\t"
+	"	bl DrawBlock \n\t"
+	"	pop {r4, lr} \n\t"
+	"	pop {r0, r1, r2, r3, r4, r5, r6, r7, lr} \n\t"
+	"	bx lr \n\t");
 
 // assumes R0 = x-coord, R1 = y-coord, R2 = colorvalue
 asm("SetPixel: \n\t"
-	"push {r0, r1, r2, r3, lr} \n\t"
-	"//mov r0, #20 // (input) \n\t"
-	"//mov r1, #30 // (input) \n\t"
-	"//mov r2, #0xFFFFFFFF // (input) \n\t"
-	"ldr r3, =VGAaddress \n\t"
-	"ldr r3, [r3] \n\t"
-	"lsl r1, r1, #10 \n\t"
-	"lsl r0, r0, #1 \n\t"
-	"add r1, r0 \n\t"
-	"strh r2, [r3, r1] \n\t"
-	"pop {r0, r1, r2, r3, lr} \n\t"
-	"bx lr \n\t");
-
+	"	ldr r3, =VGAaddress \n\t"
+	"	ldr r3, [r3] \n\t"
+	"	lsl r0, r0, #1 \n\t"
+	"	lsl r1, r1, #10 \n\t"
+	"	add r1, r1, r0 \n\t"
+	"	strh r2, [r3, r1] \n\t"
+	"	bx lr \n\t");
 
 // TODO: Implement the DrawBlock function in assembly. You need to accept 5 parameters, as outlined in the c declaration above (unsigned int x, unsigned int y, unsigned int width, unsigned int height, unsigned int color)
-// assume R0 = x-coord, R1 = y-coord, R2 = colorvalue, R3 = width, R4 = height
+// assume R0 = x-coord, R1 = y-coord, R2 = width, R3 = height, sp+4 = color
 asm("DrawBlock: \n\t"
-	"	push {r0, r1, r2, r3, r4, r5, r6, lr} \n\t"
-	"	//mov r0, #100 // x (input) \n\t"
-	"	//mov r1, #40 // y (input) \n\t"
-	"	//mov r2, #0xFFFFFFFF // color (input) \n\t"
-	"	//mov r3, #120 // width (input) \n\t"
-	"	//mov r4, #140 // height (input) \n\t"
-	"	add r5, r0, r3 // final x \n\t"
-	"	add r6, r1, r4 // final y \n\t"
+	"	add r5, r0, r2 // final x \n\t"
+	"	add r6, r1, r3 // final y \n\t"
+	"	ldr r7, [sp, #4] \n\t"
+	/*"	mov r7, #0x07e0 \n\t"*/
 	"DrawLoop: \n\t"
+	"	push {r0, r1, r2, r3, r4, lr} \n\t"
+	"	mov r2, r7 \n\t"
 	"	bl SetPixel \n\t"
+	"	pop {r0, r1, r2, r3, r4, lr} \n\t"
 	"	add r0, r0, #1 \n\t"
 	"	cmp r0, r5 \n\t"
 	"	bne DrawLoop // don't loop if x value is final \n\t"
-	"	subs r0, r0, r3 // reset x \n\t"
+	"	subs r0, r0, r2 // reset x \n\t"
 	"	add r1, r1, #1 \n\t"
 	"	cmp r1, r6 \n\t"
 	"	bne DrawLoop // don't loop if y value is final \n\t"
-	"	pop {r0, r1, r2, r3, r4, r5, r6, lr} \n\t"
 	"	bx lr \n\t");
-
 
 // TODO: Impelement the DrawBar function in assembly. You need to accept the parameter as outlined in the c declaration above (unsigned int y)
 // assumes R0 = y-coord
@@ -115,7 +107,6 @@ asm("DrawBar: \n\t"
 	"	push {r0, r1, r2, r3, r4, lr} \n\t"
 	"	mov r1, r0 // y is first input \n\t"
 	"	mov r0, #0 \n\t"
-	"	//mov r1, #120 // (input) \n\t"
 	"	mov r2, #0xFFFFFFFF \n\t"
 	"	mov r3, #7 \n\t"
 	"	mov r4, #45 \n\t"
@@ -141,6 +132,7 @@ asm("WriteUart: \n\t"
 // TODO: Implement the C functions below
 void draw_ball()
 {
+	//DrawBlock(0, 0, 50, 30, 0x07e0);
 }
 
 void draw_playing_field()
@@ -178,6 +170,7 @@ void write(char *str)
 void play()
 {
     ClearScreen();
+	currentState = Running;
     // HINT: This is the main game loop
     while (1)
     {
@@ -189,7 +182,7 @@ void play()
         }
         draw_playing_field();
         draw_ball();
-        DrawBar(120); // TODO: replace the constant value with the current position of the bar
+        /*DrawBar(120); // TODO: replace the constant value with the current position of the bar*/
     }
     if (currentState == Won)
     {
