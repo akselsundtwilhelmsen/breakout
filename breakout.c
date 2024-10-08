@@ -7,21 +7,15 @@ unsigned int __attribute__((used)) white = 0x0000FFFF;
 unsigned int __attribute__((used)) black = 0x0;
 
 unsigned char n_cols = 10; // <- This variable might change depending on the size of the game. Supported value range: [1,18]
+#define N_COLS 10
+#define N_ROWS 16
 
-char *won = "You Won";       // DON'T TOUCH THIS - keep the string as is
-char *lost = "You Lost";     // DON'T TOUCH THIS - keep the string as is
-unsigned short height = 240; // DON'T TOUCH THIS - keep the value as is
-unsigned short width = 320;  // DON'T TOUCH THIS - keep the value as is
-char font8x8[128][8];        // DON'T TOUCH THIS - this is a forward declaration
-/**************************************************************************************************/
+char *won = "You Won";       
+char *lost = "You Lost";     
+unsigned short height = 240; 
+unsigned short width = 320;  
+char font8x8[128][8];        
 
-/***
- * TODO: Define your variables below this comment
- */
-
-/***
- * You might use and modify the struct/enum definitions below this comment
- */
 typedef struct _block
 {
     unsigned char destroyed;
@@ -39,11 +33,11 @@ typedef enum _gameState
     Lost = 3,
     Exit = 4,
 } GameState;
-GameState currentState = Stopped;
 
-/***
- * Here follow the C declarations for our assembly functions
- */
+GameState currentState = Stopped;
+Block playing_field_blocks[N_COLS*N_ROWS];
+unsigned int playing_field_start = 100;
+
 
 void ClearScreen();
 void SetPixel(unsigned int x_coord, unsigned int y_coord, unsigned int color);
@@ -52,9 +46,6 @@ void DrawBar(unsigned int y);
 int ReadUart();
 void WriteUart(char c);
 
-/***
- * Now follow the assembly implementations
- */
 
 asm("ClearScreen: \n\t"
 	"	push {r0, r1, r2, r3, r4, lr} \n\t"
@@ -141,8 +132,25 @@ void draw_ball(unsigned int x, unsigned int y)
 	DrawBlock(startX, startY, 7, 7, 0x07e0);
 }
 
+void initialize_playing_field()
+{
+	for (int i = 0; i < N_COLS*N_ROWS; i++){
+		unsigned int pos_x = playing_field_start + 15 * (i % N_COLS);
+		unsigned int pos_y = 15 * (i / N_COLS);
+		unsigned int red = pos_x * 127 / 160;
+		red = red << 11;
+		unsigned int blue = pos_y * 127 / 160;
+		unsigned int color = red+blue;
+		playing_field_blocks[i] = (Block) {'0', '0', pos_x, pos_y, color};
+	}
+}
+
 void draw_playing_field()
 {
+	for (int i = 0; i < N_COLS*N_ROWS; i++){
+		Block currentBlock = playing_field_blocks[i];
+		DrawBlock(currentBlock.pos_x, currentBlock.pos_y, 15, 15, currentBlock.color);
+	}
 }
 
 void update_game_state()
@@ -182,16 +190,16 @@ void play()
     while (1)
     {
     	ClearScreen();
-		/*x++;*/
-		/*x = x % 100;*/
+		x++;
+		x = x % 100;
         /*update_game_state();*/
         /*update_bar_state();*/
         if (currentState != Running)
         {
             break;
         }
-        /*draw_playing_field();*/
-        draw_ball(120, 120);
+        draw_playing_field();
+        draw_ball(x, 120);
         DrawBar(120); // TODO: replace the constant value with the current position of the bar
     }
     if (currentState == Won)
@@ -240,6 +248,7 @@ int main(int argc, char *argv[])
     while (1)
     {
         wait_for_start();
+		initialize_playing_field();
         play();
         reset();
         if (currentState == Exit)
