@@ -38,6 +38,8 @@ GameState currentState = Stopped;
 Block playing_field_blocks[N_COLS*N_ROWS];
 unsigned int playing_field_start = 100;
 
+unsigned int bar_y = 109 ;
+
 
 void ClearScreen();
 void SetPixel(unsigned int x_coord, unsigned int y_coord, unsigned int color);
@@ -53,7 +55,7 @@ asm("ClearScreen: \n\t"
 	"	mov r1, #0 \n\t"
 	"	mov r2, #320 \n\t"
 	"	mov r3, #240 \n\t"
-	"	mov r4, #0xF \n\t"
+	"	mov r4, #0xFFFF \n\t"
 	"	push {r4} \n\t" // Push color value to stack
 	"	bl DrawBlock \n\t"
 	"	pop {r4} \n\t"
@@ -100,7 +102,7 @@ asm("DrawBar: \n\t"
 	"	mov r0, #0 \n\t"
 	"	mov r2, #7 \n\t"
 	"	mov r3, #45 \n\t"
-	"	mov r4, #0xFFFF \n\t" // set color
+	"	mov r4, #0 \n\t" // set color
 	"	push {r4} \n\t"
 	"	bl DrawBlock \n\t"
 	"	pop {r4} \n\t"
@@ -129,7 +131,7 @@ void draw_ball(unsigned int x, unsigned int y)
 	unsigned int startY = y;
 	/*unsigned int startX = x - 3;*/
 	/*unsigned int startY = y - 3;*/
-	DrawBlock(startX, startY, 7, 7, 0x07e0);
+	DrawBlock(startX, startY, 7, 7, 0);
 }
 
 void initialize_playing_field()
@@ -137,10 +139,12 @@ void initialize_playing_field()
 	for (int i = 0; i < N_COLS*N_ROWS; i++){
 		unsigned int pos_x = playing_field_start + 15 * (i % N_COLS);
 		unsigned int pos_y = 15 * (i / N_COLS);
-		unsigned int red = pos_x * 127 / 160;
+		unsigned int red = 32 * (pos_x - playing_field_start) / (15 * N_COLS);
 		red = red << 11;
-		unsigned int blue = pos_y * 127 / 160;
-		unsigned int color = red+blue;
+		unsigned int blue = 16 * (pos_y / (15 * N_ROWS));
+		unsigned int green = 63 - (32 * pos_y / (15 * N_ROWS));
+		green = green << 5;
+		unsigned int color = red+green+blue;
 		playing_field_blocks[i] = (Block) {'0', '0', pos_x, pos_y, color};
 	}
 }
@@ -174,6 +178,13 @@ void update_bar_state()
     // TODO: Read all chars in the UART Buffer and apply the respective bar position updates
     // HINT: w == 77, s == 73
     // HINT Format: 0x00 'Remaining Chars':2 'Ready 0x80':2 'Char 0xXX':2, sample: 0x00018077 (1 remaining character, buffer is ready, current character is 'w')
+	int key = ReadUart();
+	if (key == 77){
+		bar_y -= 20;
+	}
+	else if (key == 73){
+		bar_y += 20;
+	}
 }
 
 void write(char *str)
@@ -193,14 +204,14 @@ void play()
 		x++;
 		x = x % 100;
         /*update_game_state();*/
-        /*update_bar_state();*/
+        update_bar_state();
         if (currentState != Running)
         {
             break;
         }
         draw_playing_field();
         draw_ball(x, 120);
-        DrawBar(120); // TODO: replace the constant value with the current position of the bar
+        DrawBar(bar_y); // TODO: replace the constant value with the current position of the bar
     }
     if (currentState == Won)
     {
