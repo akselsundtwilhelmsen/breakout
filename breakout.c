@@ -45,7 +45,6 @@ GameState currentState = Stopped;
  * Here follow the C declarations for our assembly functions
  */
 
-// TODO: Add a C declaration for the ClearScreen assembly procedure
 void ClearScreen();
 void SetPixel(unsigned int x_coord, unsigned int y_coord, unsigned int color);
 void DrawBlock(unsigned int x, unsigned int y, unsigned int width, unsigned int height, unsigned int color);
@@ -62,12 +61,12 @@ asm("ClearScreen: \n\t"
 	"	mov r1, #0 \n\t"
 	"	mov r2, #320 \n\t"
 	"	mov r3, #240 \n\t"
-	"	mov r4, #0x07e0 \n\t"
-	"	push {r0, r1, r2, r3, r4, r5, r6, r7, lr} \n\t"
-	"	push {r4, lr} \n\t"
+	"	mov r4, #0 \n\t"
+	"	push {r0, r1, r2, r3, lr} \n\t"
+	"	push {r4} \n\t" // Push color value to stack
 	"	bl DrawBlock \n\t"
-	"	pop {r4, lr} \n\t"
-	"	pop {r0, r1, r2, r3, r4, r5, r6, r7, lr} \n\t"
+	"	pop {r4} \n\t"
+	"	pop {r0, r1, r2, r3, lr} \n\t"
 	"	bx lr \n\t");
 
 // assumes R0 = x-coord, R1 = y-coord, R2 = colorvalue
@@ -80,38 +79,38 @@ asm("SetPixel: \n\t"
 	"	strh r2, [r3, r1] \n\t"
 	"	bx lr \n\t");
 
-// TODO: Implement the DrawBlock function in assembly. You need to accept 5 parameters, as outlined in the c declaration above (unsigned int x, unsigned int y, unsigned int width, unsigned int height, unsigned int color)
 // assume R0 = x-coord, R1 = y-coord, R2 = width, R3 = height, sp+4 = color
 asm("DrawBlock: \n\t"
-	"	add r5, r0, r2 // final x \n\t"
-	"	add r6, r1, r3 // final y \n\t"
-	"	ldr r7, [sp, #4] \n\t"
-	/*"	mov r7, #0x07e0 \n\t"*/
+	"	push {r4, r5, r6, lr} \n\t"
+	"	add r5, r0, r2 \n\t" // final x 
+	"	add r6, r1, r3 \n\t" // final y 
+	"	ldr r2, [sp, #16] \n\t" // TODO try with #20 if it doesn't work
 	"DrawLoop: \n\t"
-	"	push {r0, r1, r2, r3, r4, lr} \n\t"
-	"	mov r2, r7 \n\t"
+	"	push {r0, r1, r3, lr} \n\t"
 	"	bl SetPixel \n\t"
-	"	pop {r0, r1, r2, r3, r4, lr} \n\t"
+	"	pop {r0, r1, r3, lr} \n\t"
 	"	add r0, r0, #1 \n\t"
 	"	cmp r0, r5 \n\t"
-	"	bne DrawLoop // don't loop if x value is final \n\t"
-	"	subs r0, r0, r2 // reset x \n\t"
+	"	bne DrawLoop \n\t" // don't loop if x value is final 
+	"	subs r0, r0, r5 \n\t" // reset x 
 	"	add r1, r1, #1 \n\t"
 	"	cmp r1, r6 \n\t"
-	"	bne DrawLoop // don't loop if y value is final \n\t"
+	"	bne DrawLoop \n\t" // don't loop if y value is final 
+	"	pop {r4, r5, r6, lr} \n\t"
 	"	bx lr \n\t");
 
-// TODO: Impelement the DrawBar function in assembly. You need to accept the parameter as outlined in the c declaration above (unsigned int y)
 // assumes R0 = y-coord
 asm("DrawBar: \n\t"
-	"	push {r0, r1, r2, r3, r4, lr} \n\t"
-	"	mov r1, r0 // y is first input \n\t"
+	"	push {r4, lr} \n\t"
+	"	mov r1, r0 \n\t" // y is first input
 	"	mov r0, #0 \n\t"
-	"	mov r2, #0xFFFFFFFF \n\t"
-	"	mov r3, #7 \n\t"
-	"	mov r4, #45 \n\t"
+	"	mov r2, #7 \n\t"
+	"	mov r3, #45 \n\t"
+	"	mov r4, #0xFFFFFFFF \n\t" // set color
+	"	push {r4} \n\t"
 	"	bl DrawBlock \n\t"
-	"	pop {r0, r1, r2, r3, r4, lr} \n\t"
+	"	push {r4} \n\t"
+	"	pop {r4, lr} \n\t"
 	"	bx lr \n\t");
 
 asm("ReadUart: \n\t"
