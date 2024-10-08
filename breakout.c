@@ -57,16 +57,16 @@ void WriteUart(char c);
  */
 
 asm("ClearScreen: \n\t"
+	"	push {r0, r1, r2, r3, r4, lr} \n\t"
 	"	mov r0, #0 \n\t"
 	"	mov r1, #0 \n\t"
 	"	mov r2, #320 \n\t"
 	"	mov r3, #240 \n\t"
-	"	mov r4, #0 \n\t"
-	"	push {r0, r1, r2, r3, lr} \n\t"
+	"	mov r4, #0xF \n\t"
 	"	push {r4} \n\t" // Push color value to stack
 	"	bl DrawBlock \n\t"
 	"	pop {r4} \n\t"
-	"	pop {r0, r1, r2, r3, lr} \n\t"
+	"	pop {r0, r1, r2, r3, r4, lr} \n\t"
 	"	bx lr \n\t");
 
 // assumes R0 = x-coord, R1 = y-coord, R2 = colorvalue
@@ -81,10 +81,12 @@ asm("SetPixel: \n\t"
 
 // assume R0 = x-coord, R1 = y-coord, R2 = width, R3 = height, sp+4 = color
 asm("DrawBlock: \n\t"
-	"	push {r4, r5, r6, lr} \n\t"
+	"	push {r4, r5, r6, r7, r8, lr} \n\t"
+	"	mov r7, r0 \n\t" // staring x 
+	/*"	mov r8, r1 \n\t" // starting y */
 	"	add r5, r0, r2 \n\t" // final x 
 	"	add r6, r1, r3 \n\t" // final y 
-	"	ldr r2, [sp, #16] \n\t" // TODO try with #20 if it doesn't work
+	"	ldr r2, [sp, #24] \n\t"
 	"DrawLoop: \n\t"
 	"	push {r0, r1, r3, lr} \n\t"
 	"	bl SetPixel \n\t"
@@ -92,11 +94,12 @@ asm("DrawBlock: \n\t"
 	"	add r0, r0, #1 \n\t"
 	"	cmp r0, r5 \n\t"
 	"	bne DrawLoop \n\t" // don't loop if x value is final 
-	"	subs r0, r0, r5 \n\t" // reset x 
+	/*"	subs r0, r0, r7 \n\t" // reset x */
+	"	mov r0, r7 \n\t" // reset x 
 	"	add r1, r1, #1 \n\t"
 	"	cmp r1, r6 \n\t"
 	"	bne DrawLoop \n\t" // don't loop if y value is final 
-	"	pop {r4, r5, r6, lr} \n\t"
+	"	pop {r4, r5, r6, r7, r8, lr} \n\t"
 	"	bx lr \n\t");
 
 // assumes R0 = y-coord
@@ -106,10 +109,10 @@ asm("DrawBar: \n\t"
 	"	mov r0, #0 \n\t"
 	"	mov r2, #7 \n\t"
 	"	mov r3, #45 \n\t"
-	"	mov r4, #0xFFFFFFFF \n\t" // set color
+	"	mov r4, #0xFFFF \n\t" // set color
 	"	push {r4} \n\t"
 	"	bl DrawBlock \n\t"
-	"	push {r4} \n\t"
+	"	pop {r4} \n\t"
 	"	pop {r4, lr} \n\t"
 	"	bx lr \n\t");
 
@@ -129,9 +132,13 @@ asm("WriteUart: \n\t"
 // TODO: Add the WriteUart assembly procedure here that respects the WriteUart C declaration on line 46
 
 // TODO: Implement the C functions below
-void draw_ball()
+void draw_ball(unsigned int x, unsigned int y)
 {
-	//DrawBlock(0, 0, 50, 30, 0x07e0);
+	unsigned int startX = x;
+	unsigned int startY = y;
+	/*unsigned int startX = x - 3;*/
+	/*unsigned int startY = y - 3;*/
+	DrawBlock(startX, startY, 7, 7, 0x07e0);
 }
 
 void draw_playing_field()
@@ -171,17 +178,21 @@ void play()
     ClearScreen();
 	currentState = Running;
     // HINT: This is the main game loop
+	unsigned int x = 80;
     while (1)
     {
-        update_game_state();
-        update_bar_state();
+    	ClearScreen();
+		/*x++;*/
+		/*x = x % 100;*/
+        /*update_game_state();*/
+        /*update_bar_state();*/
         if (currentState != Running)
         {
             break;
         }
-        draw_playing_field();
-        draw_ball();
-        /*DrawBar(120); // TODO: replace the constant value with the current position of the bar*/
+        /*draw_playing_field();*/
+        draw_ball(120, 120);
+        DrawBar(120); // TODO: replace the constant value with the current position of the bar
     }
     if (currentState == Won)
     {
