@@ -42,12 +42,15 @@ typedef struct _ball
 	signed int y_vel;
 } Ball;
 
+// playing field
 GameState currentState = Stopped;
-Ball ball = {50, 120, 0, -1};
+Ball ball = {50, 120, 0, -1}; // starting position
 
+// ball
 Block playing_field_blocks[N_COLS*N_ROWS];
 unsigned int playing_field_start = 100;
 
+// bar
 signed int bar_y = 109 ;
 unsigned int bar_height = 45;
 unsigned int bar_movement = 15;
@@ -135,9 +138,6 @@ asm("WriteUart: \n\t"
 	"	bx lr \n\t");
 
 
-// TODO: Add the WriteUart assembly procedure here that respects the WriteUart C declaration on line 46
-
-// TODO: Implement the C functions below
 void draw_ball(unsigned int x_old, unsigned int y_old, unsigned int x_new, unsigned int y_new)
 {
 	DrawBlock(x_old, y_old, 7, 7, 0xFFFF);
@@ -227,23 +227,19 @@ void write(char *str)
 void play()
 {
     ClearScreen();
-	unsigned int x = 80;
     while (1)
     {
 		// keep previous values for resetting the colors (slightly inefficient)
-		unsigned int x_old = x;
+		unsigned int ball_x_old = ball.x_pos;
+		unsigned int ball_y_old = ball.y_pos;
 		unsigned int bar_y_old = bar_y;
-		x++;
-		x = x % 100;
-        /*update_game_state();*/
         update_bar_state();
         if (currentState != Running)
         {
             break;
         }
         draw_playing_field();
-        draw_ball(x_old, 120, x, 120);
-		/*collision_check();*/
+        draw_ball(ball_x_old, ball_y_old, ball.x_pos, ball.y_pos);
         draw_bar(bar_y_old, bar_y);
     }
     if (currentState == Won)
