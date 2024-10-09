@@ -1,5 +1,5 @@
 unsigned long long __attribute__((used)) VGAaddress = 0xc8000000; // Memory storing pixels
-unsigned long long __attribute__((used)) UARTaddress = 0xFF201000; // Memory storing pixels
+unsigned long long __attribute__((used)) UARTaddress = 0xFF201000; // UART base address
 unsigned int __attribute__((used)) red = 0x0000F0F0;
 unsigned int __attribute__((used)) green = 0x00000F0F;
 unsigned int __attribute__((used)) blue = 0x000000FF;
@@ -48,7 +48,9 @@ Ball ball = {50, 120, 0, -1};
 Block playing_field_blocks[N_COLS*N_ROWS];
 unsigned int playing_field_start = 100;
 
-unsigned int bar_y = 109 ;
+signed int bar_y = 109 ;
+unsigned int bar_height = 45;
+unsigned int bar_movement = 15;
 
 
 void ClearScreen();
@@ -56,6 +58,7 @@ void SetPixel(unsigned int x_coord, unsigned int y_coord, unsigned int color);
 void DrawBlock(unsigned int x, unsigned int y, unsigned int width, unsigned int height, unsigned int color);
 void DrawBar(unsigned int y);
 int ReadUart();
+int ClearUart();
 void WriteUart(char c);
 
 
@@ -120,10 +123,10 @@ asm("DrawBar: \n\t"
 	"	bx lr \n\t");
 
 asm("ReadUart: \n\t"
-	"	push {r0, r1, lr} \n\t"
-	"	ldr r1, =UARTaddress \n\t"
+	/*"	push {r0, r1, lr} \n\t"*/
+	"	ldr r1, =0xFF201000 \n\t" // TODO change to UARTaddress
 	"	ldr r0, [r1] \n\t"
-	"	pop {r0, r1, lr} \n\t"
+	/*"	pop {r0, r1, lr} \n\t"*/
 	"	bx lr \n\t");
 
 asm("WriteUart: \n\t"
@@ -143,8 +146,8 @@ void draw_ball(unsigned int x_old, unsigned int y_old, unsigned int x_new, unsig
 
 void draw_bar(unsigned int y_old, unsigned int y_new)
 {
-	DrawBlock(0, y_old,	7, 45, 0xFFFF);
-	DrawBar(y_new);
+	DrawBlock(0, y_old,	7, 45, 0xFFFF); // TODO: could be optimized
+	DrawBar(y_new); // TODO: drawbar is redundant
 }
 
 void initialize_playing_field()
@@ -185,18 +188,34 @@ void update_game_state()
     // HINT: try to only do this check when we potentially have a hit, as it is relatively expensive and can slow down game play a lot
 }
 
+char read_uart_top() {
+    unsigned long long out;
+    int remaining;
+    do {
+        out = ReadUart();
+        if (!(out & 0x8000)) {
+            return 0;
+        }
+        remaining = (out & 0xFF0000) >> 4;
+    } while (remaining > 0);
+    return out & 0xFF;
+}
+
 void update_bar_state()
 {
     int remaining = 0;
-    // TODO: Read all chars in the UART Buffer and apply the respective bar position updates
-    // HINT: w == 77, s == 73
-    // HINT Format: 0x00 'Remaining Chars':2 'Ready 0x80':2 'Char 0xXX':2, sample: 0x00018077 (1 remaining character, buffer is ready, current character is 'w')
-	int key = ReadUart();
-	if (key == 77){
-		bar_y -= 20;
+	int key = read_uart_top();
+	if (key == 0x77){
+		bar_y -= bar_movement;
+	} else if (key == 0x73){
+		bar_y += bar_movement;
 	}
-	else if (key == 73){
-		bar_y += 20;
+
+	// check for out of bounds
+	if (bar_y <= 0) {
+		bar_y = 0;
+	} else if (bar_y >= height - bar_height) {
+		bar_y = height - bar_height - 1;
 	}
 }
 
@@ -208,12 +227,12 @@ void write(char *str)
 void play()
 {
     ClearScreen();
-	currentState = Running;
-    // HINT: This is the main game loop
 	unsigned int x = 80;
     while (1)
     {
+		// keep previous values for resetting the colors (slightly inefficient)
 		unsigned int x_old = x;
+		unsigned int bar_y_old = bar_y;
 		x++;
 		x = x % 100;
         /*update_game_state();*/
@@ -224,7 +243,8 @@ void play()
         }
         draw_playing_field();
         draw_ball(x_old, 120, x, 120);
-        DrawBar(bar_y);
+		/*collision_check();*/
+        draw_bar(bar_y_old, bar_y);
     }
     if (currentState == Won)
     {
@@ -261,7 +281,12 @@ void reset()
 
 void wait_for_start()
 {
-    // TODO: Implement waiting behaviour until the user presses either w/s
+    while (currentState == Stopped) {
+        char key = read_uart_top();
+        if (key == 0x77 || key == 0x73) {
+            currentState = Running;
+        }
+    }
 }
 
 int main(int argc, char *argv[])
