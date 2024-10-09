@@ -34,7 +34,17 @@ typedef enum _gameState
     Exit = 4,
 } GameState;
 
+typedef struct _ball
+{
+	unsigned int x_pos;
+	unsigned int y_pos;
+	signed int x_vel;
+	signed int y_vel;
+} Ball;
+
 GameState currentState = Stopped;
+Ball ball = {50, 120, 0, -1};
+
 Block playing_field_blocks[N_COLS*N_ROWS];
 unsigned int playing_field_start = 100;
 
@@ -125,13 +135,16 @@ asm("WriteUart: \n\t"
 // TODO: Add the WriteUart assembly procedure here that respects the WriteUart C declaration on line 46
 
 // TODO: Implement the C functions below
-void draw_ball(unsigned int x, unsigned int y)
+void draw_ball(unsigned int x_old, unsigned int y_old, unsigned int x_new, unsigned int y_new)
 {
-	unsigned int startX = x;
-	unsigned int startY = y;
-	/*unsigned int startX = x - 3;*/
-	/*unsigned int startY = y - 3;*/
-	DrawBlock(startX, startY, 7, 7, 0);
+	DrawBlock(x_old, y_old, 7, 7, 0xFFFF);
+	DrawBlock(x_new, y_new, 7, 7, 0);
+}
+
+void draw_bar(unsigned int y_old, unsigned int y_new)
+{
+	DrawBlock(0, y_old,	7, 45, 0xFFFF);
+	DrawBar(y_new);
 }
 
 void initialize_playing_field()
@@ -200,7 +213,7 @@ void play()
 	unsigned int x = 80;
     while (1)
     {
-    	ClearScreen();
+		unsigned int x_old = x;
 		x++;
 		x = x % 100;
         /*update_game_state();*/
@@ -210,8 +223,8 @@ void play()
             break;
         }
         draw_playing_field();
-        draw_ball(x, 120);
-        DrawBar(bar_y); // TODO: replace the constant value with the current position of the bar
+        draw_ball(x_old, 120, x, 120);
+        DrawBar(bar_y);
     }
     if (currentState == Won)
     {
