@@ -36,22 +36,25 @@ typedef enum _gameState
 
 typedef struct _ball
 {
-	unsigned int x_pos;
-	unsigned int y_pos;
+	signed int x_pos;
+	signed int y_pos;
 	signed int x_vel;
 	signed int y_vel;
 } Ball;
 
 // playing field
 GameState currentState = Stopped;
-Ball ball = {50, 120, 0, -1}; // starting position
+Ball ball = {50, 120, -1, 0}; // starting position
 
 // ball
 Block playing_field_blocks[N_COLS*N_ROWS];
 unsigned int playing_field_start = 100;
+unsigned int ball_radius = 7;
+unsigned int ball_speed = 1;
 
 // bar
 signed int bar_y = 109 ;
+unsigned int bar_width = 7;
 unsigned int bar_height = 45;
 unsigned int bar_movement = 15;
 
@@ -140,8 +143,8 @@ asm("WriteUart: \n\t"
 
 void draw_ball(unsigned int x_old, unsigned int y_old, unsigned int x_new, unsigned int y_new)
 {
-	DrawBlock(x_old, y_old, 7, 7, 0xFFFF);
-	DrawBlock(x_new, y_new, 7, 7, 0);
+	DrawBlock(x_old, y_old, ball_radius, ball_radius, 0xFFFF);
+	DrawBlock(x_new, y_new, ball_radius, ball_radius, 0);
 }
 
 void draw_bar(unsigned int y_old, unsigned int y_new)
@@ -173,6 +176,28 @@ void draw_playing_field()
 	}
 }
 
+void hit_check_bar()
+{
+	ball.x_pos = bar_width;
+	unsigned int ball_y_center = ball.y_pos + 3;
+	if (ball_y_center >= bar_y && ball_y_center < bar_y + 15) {
+		ball.x_vel = -1 * ball.x_vel;
+		ball.y_vel = -ball_speed;
+	} else if (ball_y_center >= bar_y + 15 && ball_y_center < bar_y + 30) {
+		ball.x_vel = -1 * ball.x_vel;
+		ball.y_vel = 0;
+	} else if (ball_y_center >= bar_y + 30 && ball_y_center < bar_y + 45) {
+		ball.x_vel = -1 * ball.x_vel;
+		ball.y_vel = ball_speed;
+	} else {
+		currentState = Lost;
+	}
+}
+
+void hit_check_playing_field()
+{
+}
+
 void update_game_state()
 {
     if (currentState != Running)
@@ -183,9 +208,26 @@ void update_game_state()
     // TODO: Check: game won? game lost?
 
     // TODO: Update balls position and direction
+	ball.x_pos += ball.x_vel;
+	ball.y_pos += ball.y_vel;
+	// y bounds check 
+	if (ball.y_pos <= 0){
+		ball.y_pos = 0;
+		ball.y_vel = -1 * ball.y_vel;
+	} else if (ball.y_pos >= height) {
+		ball.y_pos = height - 1;
+		ball.y_vel = -1 * ball.y_vel;
+	}
+	// x bounds check 
+	if (ball.x_pos <= bar_width){
+		hit_check_bar();
+	} else if (ball.x_pos >= playing_field_start) { // TODO: could be optimized
+		hit_check_playing_field();
+		/*ball.x_vel = -1 * ball.x_vel;*/
+	}
+
 
     // TODO: Hit Check with Blocks
-    // HINT: try to only do this check when we potentially have a hit, as it is relatively expensive and can slow down game play a lot
 }
 
 char read_uart_top() {
@@ -229,11 +271,12 @@ void play()
     ClearScreen();
     while (1)
     {
-		// keep previous values for resetting the colors (slightly inefficient)
+		// keep previous values for resetting the colors (slightly inefficient to redraw)
 		unsigned int ball_x_old = ball.x_pos;
 		unsigned int ball_y_old = ball.y_pos;
 		unsigned int bar_y_old = bar_y;
         update_bar_state();
+        update_game_state();
         if (currentState != Running)
         {
             break;
