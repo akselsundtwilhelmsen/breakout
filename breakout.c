@@ -14,6 +14,8 @@ char *won = "You Won";
 char *lost = "You Lost";     
 unsigned short height = 240; 
 unsigned short width = 320;  
+#define SCREEN_HEIGHT = 240
+#define SCREEN_WIDTH = 320
 char font8x8[128][8];        
 
 typedef struct _block
@@ -48,8 +50,8 @@ Ball ball = {50, 120, -1, 0}; // starting position
 
 // ball
 Block playing_field_blocks[N_COLS*N_ROWS];
-unsigned int playing_field_start = 100;
-unsigned int ball_radius = 7;
+unsigned int playing_field_start = 320 - 1 - (N_COLS*15);
+unsigned int ball_diameter = 7;
 unsigned int ball_speed = 1;
 
 // bar
@@ -143,8 +145,8 @@ asm("WriteUart: \n\t"
 
 void draw_ball(unsigned int x_old, unsigned int y_old, unsigned int x_new, unsigned int y_new)
 {
-	DrawBlock(x_old, y_old, ball_radius, ball_radius, 0xFFFF);
-	DrawBlock(x_new, y_new, ball_radius, ball_radius, 0);
+	DrawBlock(x_old, y_old, ball_diameter, ball_diameter, 0xFFFF);
+	DrawBlock(x_new, y_new, ball_diameter, ball_diameter, 0);
 }
 
 void draw_bar(unsigned int y_old, unsigned int y_new)
@@ -172,14 +174,16 @@ void draw_playing_field()
 {
 	for (int i = 0; i < N_COLS*N_ROWS; i++){
 		Block currentBlock = playing_field_blocks[i];
-		DrawBlock(currentBlock.pos_x, currentBlock.pos_y, 15, 15, currentBlock.color);
+		/*DrawBlock(currentBlock.pos_x, currentBlock.pos_y, 15, 15, currentBlock.color);*/
+		if (currentBlock.destroyed == '0') {
+			DrawBlock(currentBlock.pos_x, currentBlock.pos_y, 15, 15, currentBlock.color);
+		}
 	}
 }
 
-void hit_check_bar()
+void hit_check_bar(unsigned int ball_y_center)
 {
 	ball.x_pos = bar_width;
-	unsigned int ball_y_center = ball.y_pos + 3;
 	if (ball_y_center >= bar_y && ball_y_center < bar_y + 15) {
 		ball.x_vel = -1 * ball.x_vel;
 		ball.y_vel = -ball_speed;
@@ -194,8 +198,35 @@ void hit_check_bar()
 	}
 }
 
-void hit_check_playing_field()
+signed int absolute(signed int a)
 {
+	if (a < 0){
+		a = -a;
+	}
+	return a;
+}
+
+void hit_check_playing_field(unsigned int ball_x_center, unsigned int ball_y_center)
+{
+	for (int i = 0; i < N_COLS*N_ROWS; i++){
+		Block *currentBlock = &playing_field_blocks[i];
+		signed int x_diff = absolute(ball.x_pos+3-(currentBlock->pos_x+7));
+		signed int y_diff = absolute(ball.y_pos+3-(currentBlock->pos_y+7));
+		if (currentBlock->destroyed == '0'){
+			if (x_diff < 10 && y_diff < 10){
+				currentBlock->destroyed = '1';
+				DrawBlock(currentBlock->pos_x, currentBlock->pos_y, 15, 15, 0xFFFF);
+				if (x_diff > y_diff){
+					ball.x_vel = -ball.x_vel;
+				} else if (y_diff > x_diff){
+					ball.y_vel = -ball.y_vel;
+				} else {
+					ball.x_vel = -ball.x_vel;
+					ball.y_vel = -ball.y_vel;
+				}
+			}
+		}
+	}
 }
 
 void update_game_state()
@@ -204,30 +235,29 @@ void update_game_state()
     {
         return;
     }
-
-    // TODO: Check: game won? game lost?
-
-    // TODO: Update balls position and direction
+	// update position
 	ball.x_pos += ball.x_vel;
 	ball.y_pos += ball.y_vel;
+	// calculate center for use in collision detection
+	unsigned int ball_x_center = ball.x_pos + 3;
+	unsigned int ball_y_center = ball.y_pos + 3;
 	// y bounds check 
 	if (ball.y_pos <= 0){
 		ball.y_pos = 0;
 		ball.y_vel = -1 * ball.y_vel;
-	} else if (ball.y_pos >= height) {
-		ball.y_pos = height - 1;
+	} else if (ball.y_pos >= height - ball_diameter) {
+		ball.y_pos = height - ball_diameter - 1;
 		ball.y_vel = -1 * ball.y_vel;
 	}
 	// x bounds check 
 	if (ball.x_pos <= bar_width){
-		hit_check_bar();
-	} else if (ball.x_pos >= playing_field_start) { // TODO: could be optimized
-		hit_check_playing_field();
-		/*ball.x_vel = -1 * ball.x_vel;*/
+		hit_check_bar(ball_y_center);
+	/*} else if (ball.x_pos >= playing_field_start - ball_diameter) { // TODO: could be optimized*/
+		if (ball.x_pos + ball_diameter >= width){
+			currentState = Won;
+		}
 	}
-
-
-    // TODO: Hit Check with Blocks
+	hit_check_playing_field(ball_x_center, ball_y_center);
 }
 
 char read_uart_top() {
@@ -245,7 +275,6 @@ char read_uart_top() {
 
 void update_bar_state()
 {
-    int remaining = 0;
 	int key = read_uart_top();
 	if (key == 0x77){
 		bar_y -= bar_movement;
@@ -266,6 +295,12 @@ void write(char *str)
     // TODO: Use WriteUart to write the string to JTAG UART
 }
 
+void yield(unsigned int n_nops)
+{
+	for (int i = 0; i < n_nops; i++){
+	}
+}
+
 void play()
 {
     ClearScreen();
@@ -281,7 +316,7 @@ void play()
         {
             break;
         }
-        draw_playing_field();
+    	draw_playing_field();
         draw_ball(ball_x_old, ball_y_old, ball.x_pos, ball.y_pos);
         draw_bar(bar_y_old, bar_y);
     }
@@ -338,6 +373,7 @@ int main(int argc, char *argv[])
         wait_for_start();
 		initialize_playing_field();
         play();
+    	ClearScreen();
         reset();
         if (currentState == Exit)
         {
