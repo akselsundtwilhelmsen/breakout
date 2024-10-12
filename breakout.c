@@ -6,8 +6,7 @@ unsigned int __attribute__((used)) blue = 0x000000FF;
 unsigned int __attribute__((used)) white = 0x0000FFFF;
 unsigned int __attribute__((used)) black = 0x0;
 
-unsigned char n_cols = 10; // <- This variable might change depending on the size of the game. Supported value range: [1,18]
-#define N_COLS 10
+#define N_COLS 16
 #define N_ROWS 16
 
 char *won = "You Won";       
@@ -93,11 +92,10 @@ asm("SetPixel: \n\t"
 	"	strh r2, [r3, r1] \n\t"
 	"	bx lr \n\t");
 
-// assume R0 = x-coord, R1 = y-coord, R2 = width, R3 = height, sp+4 = color
+// assumes R0 = x-coord, R1 = y-coord, R2 = width, R3 = height, sp+4 = color
 asm("DrawBlock: \n\t"
 	"	push {r4, r5, r6, r7, r8, lr} \n\t"
 	"	mov r7, r0 \n\t" // staring x 
-	/*"	mov r8, r1 \n\t" // starting y */
 	"	add r5, r0, r2 \n\t" // final x 
 	"	add r6, r1, r3 \n\t" // final y 
 	"	ldr r2, [sp, #24] \n\t"
@@ -108,7 +106,6 @@ asm("DrawBlock: \n\t"
 	"	add r0, r0, #1 \n\t"
 	"	cmp r0, r5 \n\t"
 	"	bne DrawLoop \n\t" // don't loop if x value is final 
-	/*"	subs r0, r0, r7 \n\t" // reset x */
 	"	mov r0, r7 \n\t" // reset x 
 	"	add r1, r1, #1 \n\t"
 	"	cmp r1, r6 \n\t"
@@ -131,10 +128,8 @@ asm("DrawBar: \n\t"
 	"	bx lr \n\t");
 
 asm("ReadUart: \n\t"
-	/*"	push {r0, r1, lr} \n\t"*/
 	"	ldr r1, =0xFF201000 \n\t" // TODO change to UARTaddress
 	"	ldr r0, [r1] \n\t"
-	/*"	pop {r0, r1, lr} \n\t"*/
 	"	bx lr \n\t");
 
 asm("WriteUart: \n\t"
@@ -151,8 +146,10 @@ void draw_ball(unsigned int x_old, unsigned int y_old, unsigned int x_new, unsig
 
 void draw_bar(unsigned int y_old, unsigned int y_new)
 {
-	DrawBlock(0, y_old,	7, 45, 0xFFFF); // TODO: could be optimized
-	DrawBar(y_new); // TODO: drawbar is redundant
+	if (y_old != y_new){
+		DrawBlock(0, y_old,	7, 45, 0xFFFF); // TODO: could be optimized
+		DrawBar(y_new); // TODO: drawbar is redundant
+	}
 }
 
 void initialize_playing_field()
@@ -160,12 +157,14 @@ void initialize_playing_field()
 	for (int i = 0; i < N_COLS*N_ROWS; i++){
 		unsigned int pos_x = playing_field_start + 15 * (i % N_COLS);
 		unsigned int pos_y = 15 * (i / N_COLS);
-		unsigned int red = 32 * (pos_x - playing_field_start) / (15 * N_COLS);
-		red = red << 11;
-		unsigned int blue = 16 * (pos_y / (15 * N_ROWS));
+
+		unsigned int blue = 15 - 16 * (pos_y / (15 * N_ROWS));
+		unsigned int red = 31 - 32 * (pos_x - playing_field_start) / (15 * N_COLS);
 		unsigned int green = 63 - (32 * pos_y / (15 * N_ROWS));
+		red = red << 11;
 		green = green << 5;
 		unsigned int color = red+green+blue;
+
 		playing_field_blocks[i] = (Block) {'0', '0', pos_x, pos_y, color};
 	}
 }
@@ -174,7 +173,6 @@ void draw_playing_field()
 {
 	for (int i = 0; i < N_COLS*N_ROWS; i++){
 		Block currentBlock = playing_field_blocks[i];
-		/*DrawBlock(currentBlock.pos_x, currentBlock.pos_y, 15, 15, currentBlock.color);*/
 		if (currentBlock.destroyed == '0') {
 			DrawBlock(currentBlock.pos_x, currentBlock.pos_y, 15, 15, currentBlock.color);
 		}
@@ -224,6 +222,7 @@ void hit_check_playing_field(unsigned int ball_x_center, unsigned int ball_y_cen
 					ball.x_vel = -ball.x_vel;
 					ball.y_vel = -ball.y_vel;
 				}
+				return; // prevents multiple blocks from being destroyed
 			}
 		}
 	}
@@ -252,10 +251,9 @@ void update_game_state()
 	// x bounds check 
 	if (ball.x_pos <= bar_width){
 		hit_check_bar(ball_y_center);
-	/*} else if (ball.x_pos >= playing_field_start - ball_diameter) { // TODO: could be optimized*/
-		if (ball.x_pos + ball_diameter >= width){
-			currentState = Won;
-		}
+	}
+	if (ball.x_pos + ball_diameter >= width){
+		currentState = Won;
 	}
 	hit_check_playing_field(ball_x_center, ball_y_center);
 }
@@ -281,7 +279,6 @@ void update_bar_state()
 	} else if (key == 0x73){
 		bar_y += bar_movement;
 	}
-
 	// check for out of bounds
 	if (bar_y <= 0) {
 		bar_y = 0;
@@ -295,28 +292,23 @@ void write(char *str)
     // TODO: Use WriteUart to write the string to JTAG UART
 }
 
-void yield(unsigned int n_nops)
-{
-	for (int i = 0; i < n_nops; i++){
-	}
-}
-
 void play()
 {
     ClearScreen();
+	DrawBar(bar_y);
     while (1)
     {
 		// keep previous values for resetting the colors (slightly inefficient to redraw)
 		unsigned int ball_x_old = ball.x_pos;
 		unsigned int ball_y_old = ball.y_pos;
 		unsigned int bar_y_old = bar_y;
+    	draw_playing_field();
         update_bar_state();
         update_game_state();
         if (currentState != Running)
         {
             break;
         }
-    	draw_playing_field();
         draw_ball(ball_x_old, ball_y_old, ball.x_pos, ball.y_pos);
         draw_bar(bar_y_old, bar_y);
     }
@@ -337,20 +329,19 @@ void play()
 
 void reset()
 {
-    // Hint: This is draining the UART buffer
     int remaining = 0;
     do
     {
         unsigned long long out = ReadUart();
         if (!(out & 0x8000))
         {
-            // not valid - abort reading
+            // not valid, abort reading
             return;
         }
         remaining = (out & 0xFF0000) >> 4;
     } while (remaining > 0);
 
-    // TODO: You might want to reset other state in here
+	Ball ball = {50, 120, -1, 0}; // starting position
 }
 
 void wait_for_start()
@@ -367,7 +358,6 @@ int main(int argc, char *argv[])
 {
     ClearScreen();
 
-    // HINT: This loop allows the user to restart the game after loosing/winning the previous game
     while (1)
     {
         wait_for_start();
